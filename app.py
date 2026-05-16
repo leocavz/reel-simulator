@@ -13,145 +13,183 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@300;400;500;600&display=swap');
 
 html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Barlow', sans-serif;
 }
 
-/* Fondo blanco limpio */
+/* Fondo negro */
 .stApp {
-    background-color: #ffffff;
+    background-color: #0a0a0a;
+    color: #ffffff;
 }
 
 /* Ocultar header y footer de Streamlit */
 #MainMenu, footer, header { visibility: hidden; }
 
-/* Contenedor principal con más aire */
+/* Contenedor */
 .block-container {
-    padding-top: 4rem;
+    padding-top: 3rem;
     padding-bottom: 4rem;
     max-width: 760px;
 }
 
-/* Título principal */
+/* Texto general blanco */
+p, li, label, .stMarkdown, div { color: #e0e0e0 !important; }
+
+/* Título */
 h1 {
-    font-size: 2.2rem !important;
-    font-weight: 700 !important;
-    color: #0a0a0a !important;
-    letter-spacing: -0.03em !important;
-    margin-bottom: 0.25rem !important;
+    font-family: 'Barlow Condensed', sans-serif !important;
+    font-size: 3rem !important;
+    font-weight: 900 !important;
+    color: #ffffff !important;
+    letter-spacing: 0.05em !important;
+    text-transform: uppercase !important;
+    margin-bottom: 0 !important;
 }
 
-/* Subtítulos */
 h2, h3 {
-    font-weight: 600 !important;
-    color: #0a0a0a !important;
-    letter-spacing: -0.02em !important;
+    font-family: 'Barlow Condensed', sans-serif !important;
+    font-weight: 700 !important;
+    color: #ffffff !important;
+    letter-spacing: 0.04em !important;
+    text-transform: uppercase !important;
 }
 
-/* Caption / texto secundario */
-.stCaption, caption {
-    color: #888888 !important;
-    font-size: 0.85rem !important;
-}
+/* Caption */
+.stCaption { color: #555555 !important; font-size: 0.82rem !important; }
 
-/* Texto area */
+/* Textarea */
 .stTextArea textarea {
-    border: 1.5px solid #e5e5e5 !important;
-    border-radius: 12px !important;
-    font-family: 'Inter', sans-serif !important;
+    background: #141414 !important;
+    border: 1px solid #2a2a2a !important;
+    border-radius: 4px !important;
+    color: #e0e0e0 !important;
+    font-family: 'Barlow', sans-serif !important;
     font-size: 0.95rem !important;
-    color: #0a0a0a !important;
     padding: 1rem !important;
-    background: #fafafa !important;
-    box-shadow: none !important;
     transition: border-color 0.2s;
 }
 .stTextArea textarea:focus {
-    border-color: #0a0a0a !important;
-    background: #ffffff !important;
+    border-color: #ffffff !important;
 }
+.stTextArea label { color: #888 !important; font-size: 0.8rem !important; text-transform: uppercase !important; letter-spacing: 0.08em !important; }
 
-/* Botón principal */
+/* Botón */
 .stButton > button[kind="primary"] {
-    background-color: #0a0a0a !important;
-    color: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #0a0a0a !important;
     border: none !important;
-    border-radius: 8px !important;
+    border-radius: 2px !important;
     padding: 0.75rem 2rem !important;
-    font-size: 0.95rem !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.01em !important;
+    font-family: 'Barlow Condensed', sans-serif !important;
+    font-size: 1rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.1em !important;
+    text-transform: uppercase !important;
     transition: background 0.2s, transform 0.1s !important;
 }
 .stButton > button[kind="primary"]:hover {
-    background-color: #222222 !important;
+    background-color: #cccccc !important;
     transform: translateY(-1px) !important;
 }
 
 /* Métrica */
 [data-testid="stMetric"] {
-    background: #f5f5f5;
-    border-radius: 12px;
+    background: #141414;
+    border: 1px solid #222;
+    border-radius: 4px;
     padding: 1.2rem 1.5rem;
 }
 [data-testid="stMetricValue"] {
-    font-size: 2.5rem !important;
-    font-weight: 700 !important;
-    color: #0a0a0a !important;
+    font-family: 'Barlow Condensed', sans-serif !important;
+    font-size: 3rem !important;
+    font-weight: 900 !important;
+    color: #ffffff !important;
 }
+[data-testid="stMetricLabel"] { color: #666 !important; text-transform: uppercase !important; font-size: 0.75rem !important; letter-spacing: 0.1em !important; }
 
 /* Progress bar */
 .stProgress > div > div {
-    background-color: #0a0a0a !important;
-    border-radius: 4px !important;
+    background-color: #ffffff !important;
+    border-radius: 0 !important;
 }
 .stProgress > div {
-    background-color: #f0f0f0 !important;
-    border-radius: 4px !important;
-    height: 6px !important;
+    background-color: #222222 !important;
+    border-radius: 0 !important;
+    height: 4px !important;
 }
 
 /* Expanders */
 .streamlit-expanderHeader {
-    font-weight: 600 !important;
-    font-size: 0.95rem !important;
-    color: #0a0a0a !important;
-    border-radius: 8px !important;
+    background: #141414 !important;
+    font-family: 'Barlow Condensed', sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 1rem !important;
+    color: #ffffff !important;
+    letter-spacing: 0.05em !important;
+    text-transform: uppercase !important;
+    border: 1px solid #222 !important;
+    border-radius: 2px !important;
 }
 .streamlit-expanderContent {
-    border-left: 2px solid #e5e5e5 !important;
+    background: #0f0f0f !important;
+    border-left: 2px solid #333 !important;
     padding-left: 1rem !important;
-    color: #444444 !important;
+    color: #aaaaaa !important;
 }
 
 /* Divider */
 hr {
-    border-color: #f0f0f0 !important;
+    border-color: #1f1f1f !important;
     margin: 2rem 0 !important;
 }
 
 /* Slider */
-.stSlider [data-baseweb="slider"] [data-testid="stThumbValue"] {
-    color: #0a0a0a !important;
-}
+.stSlider [data-baseweb="slider"] [data-testid="stThumbValue"] { color: #ffffff !important; }
+.stSlider label { color: #888 !important; text-transform: uppercase !important; font-size: 0.78rem !important; letter-spacing: 0.08em !important; }
 
-/* Cards para reels similares */
+/* Cards reels */
 .reel-card {
-    background: #f9f9f9;
-    border-radius: 10px;
-    padding: 1rem 1.2rem;
+    background: #111111;
+    border-left: 2px solid #ffffff;
+    padding: 0.9rem 1.2rem;
     margin-bottom: 0.6rem;
-    border-left: 3px solid #0a0a0a;
-    font-size: 0.9rem;
-    color: #333;
+    border-radius: 2px;
 }
 .reel-views {
-    font-weight: 700;
-    font-size: 1rem;
-    color: #0a0a0a;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 800;
+    font-size: 1.1rem;
+    color: #ffffff;
+    letter-spacing: 0.03em;
 }
+
+/* Logo header */
+.brand-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 0.5rem;
+}
+.brand-cross {
+    font-size: 1.8rem;
+    color: #ffffff;
+    font-weight: 300;
+    line-height: 1;
+}
+.brand-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #555555;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+}
+
+/* Warning/success/error en dark */
+.stAlert { background: #141414 !important; border-radius: 2px !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -275,8 +313,14 @@ def render_notas(notas):
         st.markdown(f"{icon} {texto}")
 
 # ── UI ───────────────────────────────────────────────────
-st.markdown("<h1>Simulador de Reels</h1>", unsafe_allow_html=True)
-st.caption("Análisis basado en 194 reels y 30 transcripts reales de Leo Cavz")
+st.markdown("""
+<div class="brand-header">
+    <span class="brand-cross">†</span>
+    <span class="brand-name">Tribu · Leo Cavz</span>
+</div>
+<h1>Simulador de Reels</h1>
+""", unsafe_allow_html=True)
+st.caption("Análisis basado en 194 reels y 30 transcripts reales")
 st.divider()
 
 script = st.text_area(
