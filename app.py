@@ -316,7 +316,7 @@ def similares(script, rows):
         match = len(palabras & set(re.findall(r"[a-záéíóúñ]{4,}", fuente.lower())))
         if match >= 3:
             resultados.append((match, r))
-    return sorted(resultados, reverse=True)[:3]
+    return sorted(resultados, key=lambda x: x[0], reverse=True)[:3]
 
 def render_notas(notas):
     for icon, texto in notas:
