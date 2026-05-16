@@ -195,6 +195,72 @@ if analizar and script.strip():
         st.subheader("⏱ Duración")
         render_notas(n_dur)
 
+    # ── Sugerencias de mejora ────────────────────────────
+    st.divider()
+    st.subheader("💡 Cómo mejorar este script")
+
+    sugerencias = []
+
+    # Hook
+    primera = script.strip().split("\n")[0].lower()
+    tiene_hook_viral = any(re.search(p, primera) for p, _, _ in HOOK_PATRONES)
+    if not tiene_hook_viral:
+        tema_detectado = next((p for p in PALABRAS_VIRALES if p in script.lower()), "el tema")
+        sugerencias.append((
+            "🎯 Reescribe el hook",
+            f"Tu primera línea no engancha. Prueba alguno de estos formatos que te han funcionado:\n\n"
+            f"- *\"En los últimos [X meses/días], [algo que te pasó relacionado con {tema_detectado}]...\"*\n"
+            f"- *\"Hablemos de {tema_detectado} — y por qué la mayoría lo está haciendo mal.\"*\n"
+            f"- *\"¿Es posible [promesa concreta relacionada con {tema_detectado}]? Sí, y aquí te explico cómo.\"*"
+        ))
+
+    # Tema
+    temas_presentes = [p for p in PALABRAS_VIRALES if p in script.lower()]
+    if not temas_presentes:
+        sugerencias.append((
+            "🔥 Conecta con un tema de alto impacto",
+            "Tu script no menciona ninguno de tus temas más virales. Intenta anclar el mensaje a:\n\n"
+            "- **Dinero / hacerse millonario** — siempre funciona en tu audiencia\n"
+            "- **Disciplina / proceso** — Monk Mode, Winter Arc, mentalidad\n"
+            "- **Crítica al sistema** — universidad, cursos caros, política\n\n"
+            "No tienes que cambiar el tema, solo conectarlo explícitamente."
+        ))
+
+    # Hashtags
+    tags = re.findall(r"#\w+", script.lower())
+    buenos_tags = [t for t in tags if t in TOP_HASHTAGS]
+    if not buenos_tags:
+        sugerencias.append((
+            "💬 Agrega hashtags probados",
+            "Ninguno de tus hashtags actuales aparece en tus reels virales. Al final del caption agrega:\n\n"
+            "`#motivacion #negocios #podcast #crecimientopersonal`"
+        ))
+
+    # Duración
+    if duracion > 70:
+        sugerencias.append((
+            "⏱ Recorta la duración",
+            f"Con {duracion} seg estás fuera de tu zona óptima (30-55 seg). Identifica qué parte del script "
+            f"puedes eliminar sin perder el mensaje central. Tus reels más virales van directo al punto."
+        ))
+
+    # CTA
+    if not any(w in script.lower() for w in ["comenta", "comentarios", "sígueme", "comparte", "link", "cavz"]):
+        sugerencias.append((
+            "📣 Añade un llamado a la acción",
+            "Tus reels virales casi siempre terminan con un CTA. Por ejemplo:\n\n"
+            "- *\"Comenta CAVZ si quieres el video completo.\"*\n"
+            "- *\"Sígueme si eres un despierto.\"*\n"
+            "- *\"¿Estás de acuerdo? Dímelo en los comentarios.\"*"
+        ))
+
+    if not sugerencias:
+        st.success("✅ El script está bien estructurado. Solo grábalo y publícalo.")
+    else:
+        for titulo, detalle in sugerencias:
+            with st.expander(titulo):
+                st.markdown(detalle)
+
     sim = similares(script, rows)
     if sim:
         st.divider()
