@@ -69,10 +69,17 @@ h2, h3 {
     font-family: 'Barlow', sans-serif !important;
     font-size: 0.95rem !important;
     padding: 1rem !important;
-    transition: border-color 0.2s;
+    outline: none !important;
+    box-shadow: none !important;
 }
 .stTextArea textarea:focus {
-    border-color: #ffffff !important;
+    border-color: #555555 !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+.stTextArea > div {
+    border: none !important;
+    box-shadow: none !important;
 }
 .stTextArea label { color: #888 !important; font-size: 0.8rem !important; text-transform: uppercase !important; letter-spacing: 0.08em !important; }
 
@@ -89,6 +96,9 @@ h2, h3 {
     letter-spacing: 0.1em !important;
     text-transform: uppercase !important;
     transition: background 0.2s, transform 0.1s !important;
+}
+.stButton > button[kind="primary"] p {
+    color: #0a0a0a !important;
 }
 .stButton > button[kind="primary"]:hover {
     background-color: #cccccc !important;
