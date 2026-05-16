@@ -208,12 +208,13 @@ CSV_FILE = BASE / "leo_cavz_reels.csv"
 TRANSCRIPTS_DIR = BASE / "transcripts"
 
 PALABRAS_VIRALES = {
-    "vida": 8, "quieres": 8, "despierto": 9, "dólares": 8, "dinero": 8,
-    "comentarios": 6, "negocios": 8, "libro": 7, "proceso": 7, "novia": 6,
-    "disciplina": 8, "millonario": 9, "universidad": 7, "curso": 6,
+    "vida": 8, "quieres": 8, "despierto": 9, "dólares": 8, "dinero": 9,
+    "comentarios": 6, "negocio": 8, "negocios": 8, "libro": 7, "proceso": 7,
+    "novia": 6, "disciplina": 8, "millonario": 9, "universidad": 7, "curso": 6,
     "monk mode": 9, "winter arc": 8, "manifestar": 7, "banco": 7,
-    "bancarrota": 8, "marketing": 7, "pinche": 5, "pendejo": 6,
-    "verga": 4, "wey": 4, "chingados": 5,
+    "bancarrota": 8, "marketing": 8, "pinche": 5, "pendejo": 6,
+    "verga": 4, "wey": 4, "chingados": 5, "sígueme": 6, "modelo": 6,
+    "tiempo": 6, "puedes": 5, "tienes": 5, "literalmente": 5,
 }
 
 HOOK_PATRONES = [
@@ -330,7 +331,7 @@ st.markdown("""
 </div>
 <h1>Simulador de Reels</h1>
 """, unsafe_allow_html=True)
-st.caption("Análisis basado en 194 reels y 30 transcripts reales")
+st.caption("Análisis basado en 194 reels y 191 transcripts reales")
 st.divider()
 
 script = st.text_area(
