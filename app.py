@@ -11,6 +11,150 @@ st.set_page_config(
     layout="centered",
 )
 
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+}
+
+/* Fondo blanco limpio */
+.stApp {
+    background-color: #ffffff;
+}
+
+/* Ocultar header y footer de Streamlit */
+#MainMenu, footer, header { visibility: hidden; }
+
+/* Contenedor principal con más aire */
+.block-container {
+    padding-top: 4rem;
+    padding-bottom: 4rem;
+    max-width: 760px;
+}
+
+/* Título principal */
+h1 {
+    font-size: 2.2rem !important;
+    font-weight: 700 !important;
+    color: #0a0a0a !important;
+    letter-spacing: -0.03em !important;
+    margin-bottom: 0.25rem !important;
+}
+
+/* Subtítulos */
+h2, h3 {
+    font-weight: 600 !important;
+    color: #0a0a0a !important;
+    letter-spacing: -0.02em !important;
+}
+
+/* Caption / texto secundario */
+.stCaption, caption {
+    color: #888888 !important;
+    font-size: 0.85rem !important;
+}
+
+/* Texto area */
+.stTextArea textarea {
+    border: 1.5px solid #e5e5e5 !important;
+    border-radius: 12px !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.95rem !important;
+    color: #0a0a0a !important;
+    padding: 1rem !important;
+    background: #fafafa !important;
+    box-shadow: none !important;
+    transition: border-color 0.2s;
+}
+.stTextArea textarea:focus {
+    border-color: #0a0a0a !important;
+    background: #ffffff !important;
+}
+
+/* Botón principal */
+.stButton > button[kind="primary"] {
+    background-color: #0a0a0a !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 0.75rem 2rem !important;
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.01em !important;
+    transition: background 0.2s, transform 0.1s !important;
+}
+.stButton > button[kind="primary"]:hover {
+    background-color: #222222 !important;
+    transform: translateY(-1px) !important;
+}
+
+/* Métrica */
+[data-testid="stMetric"] {
+    background: #f5f5f5;
+    border-radius: 12px;
+    padding: 1.2rem 1.5rem;
+}
+[data-testid="stMetricValue"] {
+    font-size: 2.5rem !important;
+    font-weight: 700 !important;
+    color: #0a0a0a !important;
+}
+
+/* Progress bar */
+.stProgress > div > div {
+    background-color: #0a0a0a !important;
+    border-radius: 4px !important;
+}
+.stProgress > div {
+    background-color: #f0f0f0 !important;
+    border-radius: 4px !important;
+    height: 6px !important;
+}
+
+/* Expanders */
+.streamlit-expanderHeader {
+    font-weight: 600 !important;
+    font-size: 0.95rem !important;
+    color: #0a0a0a !important;
+    border-radius: 8px !important;
+}
+.streamlit-expanderContent {
+    border-left: 2px solid #e5e5e5 !important;
+    padding-left: 1rem !important;
+    color: #444444 !important;
+}
+
+/* Divider */
+hr {
+    border-color: #f0f0f0 !important;
+    margin: 2rem 0 !important;
+}
+
+/* Slider */
+.stSlider [data-baseweb="slider"] [data-testid="stThumbValue"] {
+    color: #0a0a0a !important;
+}
+
+/* Cards para reels similares */
+.reel-card {
+    background: #f9f9f9;
+    border-radius: 10px;
+    padding: 1rem 1.2rem;
+    margin-bottom: 0.6rem;
+    border-left: 3px solid #0a0a0a;
+    font-size: 0.9rem;
+    color: #333;
+}
+.reel-views {
+    font-weight: 700;
+    font-size: 1rem;
+    color: #0a0a0a;
+}
+</style>
+""", unsafe_allow_html=True)
+
 BASE = Path(__file__).parent
 CSV_FILE = BASE / "leo_cavz_reels.csv"
 TRANSCRIPTS_DIR = BASE / "transcripts"
@@ -131,20 +275,23 @@ def render_notas(notas):
         st.markdown(f"{icon} {texto}")
 
 # ── UI ───────────────────────────────────────────────────
-st.title("🎬 Simulador de Reels")
-st.caption("Basado en el análisis de tus 194 reels y 30 transcripts reales · Leo Cavz")
+st.markdown("<h1>Simulador de Reels</h1>", unsafe_allow_html=True)
+st.caption("Análisis basado en 194 reels y 30 transcripts reales de Leo Cavz")
 st.divider()
 
 script = st.text_area(
-    "Pega tu script aquí",
+    "Script del reel",
     height=280,
-    placeholder="Escribe o pega el script de tu reel...",
+    placeholder="Pega aquí el script o caption de tu reel...",
+    label_visibility="visible",
 )
 
-duracion = st.slider("Duración estimada del reel (segundos)", 0, 120, 0, step=5,
+st.markdown("<br>", unsafe_allow_html=True)
+duracion = st.slider("Duración estimada (segundos)", 0, 120, 0, step=5,
                      help="Pon 0 si no sabes aún")
+st.markdown("<br>", unsafe_allow_html=True)
 
-analizar = st.button("🔍 Analizar reel", type="primary", use_container_width=True)
+analizar = st.button("Analizar reel", type="primary", use_container_width=True)
 
 if analizar and script.strip():
     rows = cargar_datos()
@@ -264,11 +411,17 @@ if analizar and script.strip():
     sim = similares(script, rows)
     if sim:
         st.divider()
-        st.subheader("📊 Tus reels más similares")
+        st.subheader("Reels tuyos más similares")
         for _, r in sim:
             fuente = "transcript" if r["_transcript"] else "caption"
             hook = (r["_transcript"] or r["caption"])[:100]
-            st.markdown(f"**{int(r['_views']):,} views** · `{fuente}` · {hook}…")
+            st.markdown(f"""
+            <div class="reel-card">
+                <span class="reel-views">{int(r['_views']):,} views</span>
+                <span style="color:#999;font-size:0.8rem;margin-left:8px">{fuente}</span><br>
+                <span style="color:#555">{hook}…</span>
+            </div>
+            """, unsafe_allow_html=True)
 
 elif analizar and not script.strip():
     st.warning("Pega un script antes de analizar.")
