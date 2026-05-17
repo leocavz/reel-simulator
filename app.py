@@ -208,13 +208,17 @@ CSV_FILE = BASE / "leo_cavz_reels.csv"
 TRANSCRIPTS_DIR = BASE / "transcripts"
 
 PALABRAS_VIRALES = {
-    "vida": 8, "quieres": 8, "despierto": 9, "dólares": 8, "dinero": 9,
-    "comentarios": 6, "negocio": 8, "negocios": 8, "libro": 7, "proceso": 7,
-    "novia": 6, "disciplina": 8, "millonario": 9, "universidad": 7, "curso": 6,
-    "monk mode": 9, "winter arc": 8, "manifestar": 7, "banco": 7,
-    "bancarrota": 8, "marketing": 8, "pinche": 5, "pendejo": 6,
-    "verga": 4, "wey": 4, "chingados": 5, "sígueme": 6, "modelo": 6,
-    "tiempo": 6, "puedes": 5, "tienes": 5, "literalmente": 5,
+    # Alto save rate (>5%) — contenido que la gente guarda
+    "estoicismo": 10, "brian tracy": 10, "mamón": 9, "proceso": 9,
+    "libro": 9, "conocimiento": 9, "iman gadzhi": 9, "estafa": 8,
+    # Alto share rate — contenido que se comparte
+    "millonario": 9, "dinero": 9, "negocios": 8, "curso": 8,
+    "universidad": 8, "bancarrota": 8, "marketing": 8,
+    # Alto volumen en transcripts virales
+    "vida": 7, "quieres": 7, "despierto": 8, "dólares": 8,
+    "negocio": 7, "disciplina": 8, "banco": 7, "manifestar": 7,
+    "monk mode": 9, "winter arc": 8, "novia": 6, "sígueme": 6,
+    "pendejo": 5, "verga": 4, "wey": 4, "pinche": 4,
 }
 
 HOOK_PATRONES = [
@@ -238,10 +242,18 @@ def cargar_datos():
     with open(CSV_FILE) as f:
         rows = list(csv.DictReader(f))
     for r in rows:
-        try:
-            r["_views"] = int(r["views"])
-        except:
-            r["_views"] = 0
+        try: r["_views"] = int(r["views"])
+        except: r["_views"] = 0
+        try: r["_saves"] = int(r["saves"]) if r.get("saves") else 0
+        except: r["_saves"] = 0
+        try: r["_shares"] = int(r["shares"]) if r.get("shares") else 0
+        except: r["_shares"] = 0
+        try: r["_reach"] = int(r["reach"]) if r.get("reach") else 0
+        except: r["_reach"] = 0
+        try: r["_avg_watch"] = int(r["avg_watch_ms"]) / 1000 if r.get("avg_watch_ms") else 0
+        except: r["_avg_watch"] = 0
+        r["_save_rate"] = r["_saves"] / r["_reach"] * 100 if r["_reach"] > 0 else 0
+        r["_share_rate"] = r["_shares"] / r["_reach"] * 100 if r["_reach"] > 0 else 0
         code = r["shortCode"]
         txt = TRANSCRIPTS_DIR / f"{code}.txt"
         r["_transcript"] = txt.read_text(encoding="utf-8") if txt.exists() else ""
@@ -331,7 +343,7 @@ st.markdown("""
 </div>
 <h1>Simulador de Reels</h1>
 """, unsafe_allow_html=True)
-st.caption("Análisis basado en 194 reels y 191 transcripts reales")
+st.caption("Análisis basado en 194 reels · 191 transcripts · saves, shares y retención reales")
 st.divider()
 
 script = st.text_area(
@@ -470,11 +482,15 @@ if analizar and script.strip():
         for _, r in sim:
             fuente = "transcript" if r["_transcript"] else "caption"
             hook = (r["_transcript"] or r["caption"])[:100]
+            save_str = f"{r['_save_rate']:.1f}% saves" if r["_save_rate"] else ""
+            share_str = f"{r['_share_rate']:.1f}% shares" if r["_share_rate"] else ""
+            watch_str = f"{r['_avg_watch']:.0f}s retención" if r["_avg_watch"] else ""
+            metrics = " · ".join(filter(None, [save_str, share_str, watch_str]))
             st.markdown(f"""
             <div class="reel-card">
                 <span class="reel-views">{int(r['_views']):,} views</span>
-                <span style="color:#999;font-size:0.8rem;margin-left:8px">{fuente}</span><br>
-                <span style="color:#555">{hook}…</span>
+                <span style="color:#666;font-size:0.8rem;margin-left:8px">{metrics}</span><br>
+                <span style="color:#555;font-size:0.85rem">{hook}…</span>
             </div>
             """, unsafe_allow_html=True)
 
