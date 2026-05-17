@@ -336,6 +336,14 @@ def render_notas(notas):
     for icon, texto in notas:
         st.markdown(f"{icon} {texto}")
 
+# ── Session state ────────────────────────────────────────
+if "script" not in st.session_state:
+    st.session_state.script = ""
+if "duracion" not in st.session_state:
+    st.session_state.duracion = 0
+if "analizado" not in st.session_state:
+    st.session_state.analizado = False
+
 # ── UI ───────────────────────────────────────────────────
 st.markdown("""
 <div class="brand-header">
@@ -352,16 +360,23 @@ script = st.text_area(
     height=280,
     placeholder="Pega aquí el script o caption de tu reel...",
     label_visibility="visible",
+    value=st.session_state.script,
 )
 
 st.markdown("<br>", unsafe_allow_html=True)
-duracion = st.slider("Duración estimada (segundos)", 0, 120, 0, step=5,
+duracion = st.slider("Duración estimada (segundos)", 0, 120, st.session_state.duracion, step=5,
                      help="Pon 0 si no sabes aún")
 st.markdown("<br>", unsafe_allow_html=True)
 
-analizar = st.button("Analizar reel", type="primary", use_container_width=True)
+if st.button("Analizar reel", type="primary", use_container_width=True) and script.strip():
+    st.session_state.script = script
+    st.session_state.duracion = duracion
+    st.session_state.analizado = True
 
-if analizar and script.strip():
+if st.session_state.analizado and st.session_state.script.strip():
+    script = st.session_state.script
+    duracion = st.session_state.duracion
+    if True:
     rows = cargar_datos()
     con_transcript = sum(1 for r in rows if r["_transcript"])
 
