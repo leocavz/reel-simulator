@@ -376,7 +376,6 @@ if st.button("Analizar reel", type="primary", use_container_width=True) and scri
 if st.session_state.analizado and st.session_state.script.strip():
     script = st.session_state.script
     duracion = st.session_state.duracion
-    if True:
     rows = cargar_datos()
     con_transcript = sum(1 for r in rows if r["_transcript"])
 
