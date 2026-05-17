@@ -5,6 +5,16 @@ from pathlib import Path
 from collections import Counter
 import anthropic
 
+# ── Detección de idioma ──────────────────────────────────
+_ES = {"que","de","la","el","en","los","las","un","una","con","por","para","del","este","esto","como","pero","más","muy","hay","ser","fue","son","están","tiene","cuando","también","porque","sobre","entre","sin","ya","todo","qué","cómo","mi","me","te","tu","le","su","si","no","es","se","al","lo","sus","era","una"}
+_EN = {"the","is","are","you","i","it","and","of","to","in","that","for","on","with","this","they","be","have","at","from","or","but","an","not","what","your","all","can","her","him","just","so","if","about","who","get","do","my","we","when","how","said","know","think","like","up","go","there","one","out","people","will"}
+
+def detectar_idioma(texto):
+    words = set(re.findall(r"[a-zA-Z]{2,}", texto.lower()))
+    es = len(words & _ES)
+    en = len(words & _EN)
+    return "en" if en > es else "es"
+
 # ── Config ──────────────────────────────────────────────
 st.set_page_config(
     page_title="Simulador de Reels · Leo Cavz",
@@ -208,24 +218,19 @@ BASE = Path(__file__).parent
 CSV_FILE = BASE / "leo_cavz_reels.csv"
 TRANSCRIPTS_DIR = BASE / "transcripts"
 
-# Palabras distintivas extraídas SOLO de transcripts virales vs no virales
-PALABRAS_VIRALES = {
-    # Multiplicadores muy altos en virales (análisis transcript-only)
+# ── Palabras y hooks en ESPAÑOL (de transcripts virales de Leo) ─────────────
+PALABRAS_VIRALES_ES = {
     "comentarios": 12, "despierto": 12, "marketing": 10, "modelo": 10,
     "dólares": 9, "dinero": 9, "millonario": 9, "negocios": 8,
     "negocio": 8, "disciplina": 9, "proceso": 8, "banco": 8,
-    # Temas de identidad y crítica — alta frecuencia en top reels
     "estoicismo": 10, "estafa": 9, "universidad": 8, "curso": 8,
     "bancarrota": 9, "mamón": 8, "pendejo": 7, "verga": 6,
-    # Temas de mentalidad y sistema
     "monk mode": 10, "winter arc": 9, "manifestar": 7,
     "libro": 8, "conocimiento": 8, "vida": 6, "sígueme": 6,
-    # Conexión con audiencia
     "wey": 5, "pinche": 4, "novia": 6,
 }
 
-# Hooks extraídos de transcripts virales reales (no captions)
-HOOK_PATRONES = [
+HOOK_PATRONES_ES = [
     (r"en los últimos", 15, "'En los últimos X...' — tu formato más viral (611k views)"),
     (r"hablemos de", 12, "'Hablemos de...' — intro directa (hasta 324k views)"),
     (r"¿es posible", 12, "'¿Es posible...?' — pregunta retórica (555k views)"),
@@ -234,6 +239,31 @@ HOOK_PATRONES = [
     (r"hace \w+ (año|mes|semana)", 10, "historia con tiempo específico (218k views)"),
     (r"¿sabes (lo que|qué|cuánto)", 10, "pregunta directa al espectador"),
     (r"la verga", 8, "arranque directo con impacto (198k views)"),
+]
+
+# ── Palabras y hooks en INGLÉS (para analizar scripts/competidores en inglés) ─
+PALABRAS_VIRALES_EN = {
+    "money": 9, "millionaire": 9, "discipline": 9, "business": 8,
+    "mindset": 9, "rich": 8, "wealth": 9, "broke": 8,
+    "success": 7, "hustle": 7, "grind": 7, "lazy": 7,
+    "college": 7, "scam": 9, "debt": 8, "school": 6,
+    "comments": 10, "comment": 10, "follow": 6, "viral": 7,
+    "monk mode": 10, "winter arc": 9, "stoicism": 10,
+    "book": 8, "knowledge": 8, "habit": 7, "routine": 7,
+    "stupid": 7, "idiot": 6, "wake up": 9,
+}
+
+HOOK_PATRONES_EN = [
+    (r"in the last \w+", 15, "'In the last X...' — narrative hook"),
+    (r"let'?s talk about", 12, "'Let's talk about...' — direct intro"),
+    (r"is it possible", 12, "'Is it possible...?' — rhetorical question"),
+    (r"one of the things (i|that|you)", 10, "'One of the things...' — strong observation"),
+    (r"only (idiots?|fools?|broke people|losers?)", 10, "confrontational hook"),
+    (r"\d+ (years?|months?|weeks?) ago", 10, "time-anchored story"),
+    (r"do you (know|realize|understand)", 10, "direct audience question"),
+    (r"nobody tells you", 10, "'Nobody tells you...' — revelation hook"),
+    (r"stop (being|doing|saying|wasting)", 9, "'Stop...' — command hook"),
+    (r"the (truth|real reason|problem) (is|with|about)", 9, "truth-reveal hook"),
 ]
 
 @st.cache_data
@@ -258,10 +288,11 @@ def cargar_datos():
         r["_transcript"] = txt.read_text(encoding="utf-8") if txt.exists() else ""
     return sorted(rows, key=lambda r: r["_views"], reverse=True)
 
-def score_hook(script):
+def score_hook(script, idioma="es"):
     primera = script.strip().split("\n")[0].lower()[:200]
+    patrones = HOOK_PATRONES_EN if idioma == "en" else HOOK_PATRONES_ES
     score, notas = 0, []
-    for patron, pts, nombre in HOOK_PATRONES:
+    for patron, pts, nombre in patrones:
         if re.search(patron, primera):
             score += pts
             notas.append(("✅", f"Hook tipo *{nombre}*"))
@@ -269,16 +300,20 @@ def score_hook(script):
     if not notas:
         if "?" in primera:
             score += 6
-            notas.append(("⚠️", "Pregunta en el hook — funciona pero no es tu patrón más fuerte"))
+            notas.append(("⚠️", "Pregunta en el hook — funciona pero no es el patrón más fuerte"))
         else:
-            notas.append(("❌", "El hook no coincide con tus patrones virales"))
-            notas.append(("💡", "Prueba: *'En los últimos X...'* / *'Hablemos de...'* / *'¿Es posible...?'*"))
+            notas.append(("❌", "El hook no coincide con los patrones virales del nicho"))
+            if idioma == "en":
+                notas.append(("💡", "Prueba: *'In the last X...'* / *'Let's talk about...'* / *'Nobody tells you...'*"))
+            else:
+                notas.append(("💡", "Prueba: *'En los últimos X...'* / *'Hablemos de...'* / *'¿Es posible...?'*"))
     return min(score, 25), notas
 
-def score_tema(script):
+def score_tema(script, idioma="es"):
     texto = script.lower()
+    diccionario = PALABRAS_VIRALES_EN if idioma == "en" else PALABRAS_VIRALES_ES
     score, temas = 0, []
-    for palabra, peso in PALABRAS_VIRALES.items():
+    for palabra, peso in diccionario.items():
         if palabra in texto:
             score += peso
             temas.append(palabra)
@@ -288,7 +323,10 @@ def score_tema(script):
         notas.append(("✅", f"Temas virales detectados en el script: *{', '.join(temas[:6])}*"))
     else:
         notas.append(("⚠️", "No detecté temas de alto rendimiento en el contenido"))
-        notas.append(("💡", "Tus temas más fuertes: dinero, disciplina, negocios, comentarios, despierto"))
+        if idioma == "en":
+            notas.append(("💡", "Temas más fuertes en el nicho: money, discipline, mindset, scam, wake up"))
+        else:
+            notas.append(("💡", "Tus temas más fuertes: dinero, disciplina, negocios, comentarios, despierto"))
     return score, notas
 
 def score_duracion(duracion):
@@ -301,17 +339,22 @@ def score_duracion(duracion):
     else:
         return 0, [("❌", f"Fuera del rango óptimo ({duracion} seg) — recorta a 30-55 seg")]
 
-def score_cta(script):
+def score_cta(script, idioma="es"):
     texto = script.lower()
     score, notas = 0, []
-    cta_words = ["comenta", "comentarios", "sígueme", "comparte", "link", "cavz", "dímelo", "dime"]
+    cta_es = ["comenta", "comentarios", "sígueme", "comparte", "link", "cavz", "dímelo", "dime"]
+    cta_en = ["comment", "follow", "share", "link", "subscribe", "tell me", "let me know", "drop"]
+    cta_words = cta_en if idioma == "en" else cta_es
     encontrados = [w for w in cta_words if w in texto]
     if encontrados:
         score = 15
         notas.append(("✅", f"CTA presente: *{', '.join(encontrados)}*"))
     else:
-        notas.append(("❌", "Sin llamado a la acción — tus virales casi siempre terminan con CTA"))
-        notas.append(("💡", "Agrega al final: *'Comenta CAVZ'* / *'Sígueme si eres un despierto'*"))
+        notas.append(("❌", "Sin llamado a la acción — los virales casi siempre terminan con CTA"))
+        if idioma == "en":
+            notas.append(("💡", "Add at the end: *'Comment CAVZ'* / *'Follow if you're awake'* / *'Let me know below'*"))
+        else:
+            notas.append(("💡", "Agrega al final: *'Comenta CAVZ'* / *'Sígueme si eres un despierto'*"))
     return score, notas
 
 def similares(script, rows):
@@ -372,10 +415,13 @@ if st.session_state.analizado and st.session_state.script.strip():
     rows = cargar_datos()
     con_transcript = sum(1 for r in rows if r["_transcript"])
 
-    s_hook, n_hook = score_hook(script)
-    s_tema, n_tema = score_tema(script)
+    idioma = detectar_idioma(script)
+    idioma_label = "🇺🇸 Inglés detectado — análisis bilingüe, output en español" if idioma == "en" else "🇲🇽 Español detectado"
+
+    s_hook, n_hook = score_hook(script, idioma)
+    s_tema, n_tema = score_tema(script, idioma)
     s_dur, n_dur = score_duracion(duracion)
-    s_cta, n_cta = score_cta(script)
+    s_cta, n_cta = score_cta(script, idioma)
 
     total = s_hook + s_tema + s_dur + s_cta
     pct = int((total / 90) * 100)
@@ -399,6 +445,7 @@ if st.session_state.analizado and st.session_state.script.strip():
     with col2:
         st.markdown(f"### {color} {veredicto}")
         st.caption(f"Análisis basado en {con_transcript} transcripts reales")
+    st.caption(idioma_label)
 
     st.progress(pct / 100)
     st.divider()
@@ -423,38 +470,68 @@ if st.session_state.analizado and st.session_state.script.strip():
 
     # Hook
     primera = script.strip().split("\n")[0].lower()
-    tiene_hook_viral = any(re.search(p, primera) for p, _, _ in HOOK_PATRONES)
+    patrones_activos = HOOK_PATRONES_EN if idioma == "en" else HOOK_PATRONES_ES
+    diccionario_activo = PALABRAS_VIRALES_EN if idioma == "en" else PALABRAS_VIRALES_ES
+    tiene_hook_viral = any(re.search(p, primera) for p, _, _ in patrones_activos)
     if not tiene_hook_viral:
-        tema_detectado = next((p for p in PALABRAS_VIRALES if p in script.lower()), "el tema")
-        sugerencias.append((
-            "🎯 Reescribe el hook",
-            f"Tu primera línea no engancha. Prueba alguno de estos formatos que te han funcionado:\n\n"
-            f"- *\"En los últimos [X meses/días], [algo que te pasó relacionado con {tema_detectado}]...\"*\n"
-            f"- *\"Hablemos de {tema_detectado} — y por qué la mayoría lo está haciendo mal.\"*\n"
-            f"- *\"¿Es posible [promesa concreta relacionada con {tema_detectado}]? Sí, y aquí te explico cómo.\"*"
-        ))
+        tema_detectado = next((p for p in diccionario_activo if p in script.lower()), "the topic" if idioma == "en" else "el tema")
+        if idioma == "en":
+            sugerencias.append((
+                "🎯 Rewrite the hook",
+                f"Your first line doesn't hook. Try one of these viral formats:\n\n"
+                f"- *\"In the last [X months], [something that happened related to {tema_detectado}]...\"*\n"
+                f"- *\"Let's talk about {tema_detectado} — and why most people are doing it wrong.\"*\n"
+                f"- *\"Nobody tells you this about {tema_detectado}...\"*"
+            ))
+        else:
+            sugerencias.append((
+                "🎯 Reescribe el hook",
+                f"Tu primera línea no engancha. Prueba alguno de estos formatos que te han funcionado:\n\n"
+                f"- *\"En los últimos [X meses/días], [algo que te pasó relacionado con {tema_detectado}]...\"*\n"
+                f"- *\"Hablemos de {tema_detectado} — y por qué la mayoría lo está haciendo mal.\"*\n"
+                f"- *\"¿Es posible [promesa concreta relacionada con {tema_detectado}]? Sí, y aquí te explico cómo.\"*"
+            ))
 
     # Tema
-    temas_presentes = [p for p in PALABRAS_VIRALES if p in script.lower()]
+    temas_presentes = [p for p in diccionario_activo if p in script.lower()]
     if not temas_presentes:
-        sugerencias.append((
-            "🔥 Conecta con un tema de alto impacto",
-            "Tu script no menciona ninguno de tus temas más virales. Intenta anclar el mensaje a:\n\n"
-            "- **Dinero / hacerse millonario** — siempre funciona en tu audiencia\n"
-            "- **Disciplina / proceso** — Monk Mode, Winter Arc, mentalidad\n"
-            "- **Crítica al sistema** — universidad, cursos caros, estafas\n\n"
-            "No tienes que cambiar el tema, solo conectarlo explícitamente en el script."
-        ))
+        if idioma == "en":
+            sugerencias.append((
+                "🔥 Connect to a high-impact topic",
+                "Your script doesn't mention any top-performing topics. Try anchoring to:\n\n"
+                "- **Money / getting rich** — always works in this niche\n"
+                "- **Discipline / mindset** — Monk Mode, stoicism, habits\n"
+                "- **System critique** — college scam, expensive courses, debt\n\n"
+                "You don't need to change the message, just make the connection explicit."
+            ))
+        else:
+            sugerencias.append((
+                "🔥 Conecta con un tema de alto impacto",
+                "Tu script no menciona ninguno de tus temas más virales. Intenta anclar el mensaje a:\n\n"
+                "- **Dinero / hacerse millonario** — siempre funciona en tu audiencia\n"
+                "- **Disciplina / proceso** — Monk Mode, Winter Arc, mentalidad\n"
+                "- **Crítica al sistema** — universidad, cursos caros, estafas\n\n"
+                "No tienes que cambiar el tema, solo conectarlo explícitamente en el script."
+            ))
 
     # CTA
     if s_cta == 0:
-        sugerencias.append((
-            "📣 Añade un llamado a la acción",
-            "Tus reels virales casi siempre terminan con un CTA hablado. Por ejemplo:\n\n"
-            "- *\"Comenta CAVZ si quieres el video completo.\"*\n"
-            "- *\"Sígueme si eres un despierto.\"*\n"
-            "- *\"¿Estás de acuerdo? Dímelo en los comentarios.\"*"
-        ))
+        if idioma == "en":
+            sugerencias.append((
+                "📣 Add a call to action",
+                "Viral reels almost always end with a spoken CTA. For example:\n\n"
+                "- *\"Comment CAVZ if you want the full video.\"*\n"
+                "- *\"Follow if you're awake.\"*\n"
+                "- *\"Do you agree? Let me know in the comments.\"*"
+            ))
+        else:
+            sugerencias.append((
+                "📣 Añade un llamado a la acción",
+                "Tus reels virales casi siempre terminan con un CTA hablado. Por ejemplo:\n\n"
+                "- *\"Comenta CAVZ si quieres el video completo.\"*\n"
+                "- *\"Sígueme si eres un despierto.\"*\n"
+                "- *\"¿Estás de acuerdo? Dímelo en los comentarios.\"*"
+            ))
 
     # Duración
     if duracion > 70:
@@ -486,8 +563,16 @@ if st.session_state.analizado and st.session_state.script.strip():
             if r["_transcript"]
         )
 
+        idioma_instruccion = (
+            "El script original está en INGLÉS. Tu tarea es adaptarlo y reescribirlo completamente en ESPAÑOL mexicano con el tono de Leo — no es una traducción literal, es una adaptación."
+            if idioma == "en" else
+            "El script original está en español."
+        )
+
         prompt = f"""Eres el asistente de contenido de Leo Cavz, creador mexicano con 557k seguidores en Instagram.
 Su estilo es directo, coloquial, provocador y usa lenguaje mexicano auténtico (wey, pendejo, pinche, etc.).
+
+{idioma_instruccion}
 
 Sus patrones más virales extraídos de transcripts reales:
 - Hook más poderoso: "En los últimos X meses/días..." (611k views)
@@ -506,13 +591,13 @@ Script original:
 Feedback del análisis:
 {feedback_texto}
 
-Reescribe el script hablado aplicando el feedback. Mantén el mismo mensaje central pero mejora:
+Reescribe el script hablado en ESPAÑOL aplicando el feedback. Mantén el mismo mensaje central pero mejora:
 1. El hook (primera línea debe enganchar en 2 segundos)
 2. El ritmo y fluidez para una duración de 30-55 seg
 3. El llamado a la acción hablado al final
 4. El tono auténtico de Leo — directo, sin rodeos, lenguaje mexicano natural
 
-Devuelve SOLO el script reescrito, como si fuera lo que Leo va a decir frente a la cámara. Sin explicaciones."""
+Devuelve SOLO el script reescrito en español, como si fuera lo que Leo va a decir frente a la cámara. Sin explicaciones."""
 
         with st.spinner("Reescribiendo..."):
             try:
