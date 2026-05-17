@@ -208,34 +208,32 @@ BASE = Path(__file__).parent
 CSV_FILE = BASE / "leo_cavz_reels.csv"
 TRANSCRIPTS_DIR = BASE / "transcripts"
 
+# Palabras distintivas extraídas SOLO de transcripts virales vs no virales
 PALABRAS_VIRALES = {
-    # Alto save rate (>5%) — contenido que la gente guarda
-    "estoicismo": 10, "brian tracy": 10, "mamón": 9, "proceso": 9,
-    "libro": 9, "conocimiento": 9, "iman gadzhi": 9, "estafa": 8,
-    # Alto share rate — contenido que se comparte
-    "millonario": 9, "dinero": 9, "negocios": 8, "curso": 8,
-    "universidad": 8, "bancarrota": 8, "marketing": 8,
-    # Alto volumen en transcripts virales
-    "vida": 7, "quieres": 7, "despierto": 8, "dólares": 8,
-    "negocio": 7, "disciplina": 8, "banco": 7, "manifestar": 7,
-    "monk mode": 9, "winter arc": 8, "novia": 6, "sígueme": 6,
-    "pendejo": 5, "verga": 4, "wey": 4, "pinche": 4,
+    # Multiplicadores muy altos en virales (análisis transcript-only)
+    "comentarios": 12, "despierto": 12, "marketing": 10, "modelo": 10,
+    "dólares": 9, "dinero": 9, "millonario": 9, "negocios": 8,
+    "negocio": 8, "disciplina": 9, "proceso": 8, "banco": 8,
+    # Temas de identidad y crítica — alta frecuencia en top reels
+    "estoicismo": 10, "estafa": 9, "universidad": 8, "curso": 8,
+    "bancarrota": 9, "mamón": 8, "pendejo": 7, "verga": 6,
+    # Temas de mentalidad y sistema
+    "monk mode": 10, "winter arc": 9, "manifestar": 7,
+    "libro": 8, "conocimiento": 8, "vida": 6, "sígueme": 6,
+    # Conexión con audiencia
+    "wey": 5, "pinche": 4, "novia": 6,
 }
 
+# Hooks extraídos de transcripts virales reales (no captions)
 HOOK_PATRONES = [
-    (r"en los últimos", 15, "historia personal de inicio"),
-    (r"hablemos de", 12, "intro directa al tema"),
-    (r"¿es posible", 12, "pregunta retórica"),
-    (r"una de las cosas que", 10, "observación provocadora"),
-    (r"solo los pendejos", 10, "confrontacional"),
-    (r"hace \w+ (año|mes|semana)", 10, "historia con tiempo específico"),
+    (r"en los últimos", 15, "'En los últimos X...' — tu formato más viral (611k views)"),
+    (r"hablemos de", 12, "'Hablemos de...' — intro directa (hasta 324k views)"),
+    (r"¿es posible", 12, "'¿Es posible...?' — pregunta retórica (555k views)"),
+    (r"una de las cosas que", 10, "'Una de las cosas que...' — observación fuerte (527k views)"),
+    (r"solo los pendejos", 10, "'Solo los pendejos...' — confrontacional (200k views)"),
+    (r"hace \w+ (año|mes|semana)", 10, "historia con tiempo específico (218k views)"),
     (r"¿sabes (lo que|qué|cuánto)", 10, "pregunta directa al espectador"),
-]
-
-TOP_HASHTAGS = [
-    "#motivacion", "#negocios", "#podcast", "#crecimientopersonal",
-    "#viral", "#dinero", "#disciplina", "#saludmental", "#transformacion",
-    "#despiertospodcast", "#dios",
+    (r"la verga", 8, "arranque directo con impacto (198k views)"),
 ]
 
 @st.cache_data
@@ -266,7 +264,7 @@ def score_hook(script):
     for patron, pts, nombre in HOOK_PATRONES:
         if re.search(patron, primera):
             score += pts
-            notas.append(("✅", f"Hook tipo *{nombre}* — muy efectivo en tus virales"))
+            notas.append(("✅", f"Hook tipo *{nombre}*"))
             break
     if not notas:
         if "?" in primera:
@@ -275,9 +273,6 @@ def score_hook(script):
         else:
             notas.append(("❌", "El hook no coincide con tus patrones virales"))
             notas.append(("💡", "Prueba: *'En los últimos X...'* / *'Hablemos de...'* / *'¿Es posible...?'*"))
-    if re.search(r"❌.*❌", script.strip().split("\n")[0]):
-        score += 10
-        notas.append(("✅", "Formato ❌ TITULO ❌ en caption"))
     return min(score, 25), notas
 
 def score_tema(script):
@@ -287,29 +282,13 @@ def score_tema(script):
         if palabra in texto:
             score += peso
             temas.append(palabra)
-    score = min(score, 30)
+    score = min(score, 35)
     notas = []
     if temas:
-        notas.append(("✅", f"Temas virales detectados: *{', '.join(temas[:6])}*"))
+        notas.append(("✅", f"Temas virales detectados en el script: *{', '.join(temas[:6])}*"))
     else:
-        notas.append(("⚠️", "No detecté temas de alto rendimiento"))
-        notas.append(("💡", "Tus temas más fuertes: dinero, disciplina, negocios, vida, proceso"))
-    return score, notas
-
-def score_hashtags(script):
-    tags = re.findall(r"#\w+", script.lower())
-    buenos = [t for t in tags if t in TOP_HASHTAGS]
-    score, notas = 0, []
-    if buenos:
-        score += min(len(buenos) * 5, 15)
-        notas.append(("✅", f"Hashtags que te funcionan: *{', '.join(buenos)}*"))
-    else:
-        notas.append(("⚠️", "Sin hashtags probados — agrega: #motivacion #negocios #podcast"))
-    if 3 <= len(tags) <= 6:
-        score += 5
-        notas.append(("✅", "Cantidad de hashtags ideal (3-6)"))
-    elif len(tags) > 6:
-        notas.append(("⚠️", "Demasiados hashtags — tus virales usan 3-5 máximo"))
+        notas.append(("⚠️", "No detecté temas de alto rendimiento en el contenido"))
+        notas.append(("💡", "Tus temas más fuertes: dinero, disciplina, negocios, comentarios, despierto"))
     return score, notas
 
 def score_duracion(duracion):
@@ -322,12 +301,26 @@ def score_duracion(duracion):
     else:
         return 0, [("❌", f"Fuera del rango óptimo ({duracion} seg) — recorta a 30-55 seg")]
 
+def score_cta(script):
+    texto = script.lower()
+    score, notas = 0, []
+    cta_words = ["comenta", "comentarios", "sígueme", "comparte", "link", "cavz", "dímelo", "dime"]
+    encontrados = [w for w in cta_words if w in texto]
+    if encontrados:
+        score = 15
+        notas.append(("✅", f"CTA presente: *{', '.join(encontrados)}*"))
+    else:
+        notas.append(("❌", "Sin llamado a la acción — tus virales casi siempre terminan con CTA"))
+        notas.append(("💡", "Agrega al final: *'Comenta CAVZ'* / *'Sígueme si eres un despierto'*"))
+    return score, notas
+
 def similares(script, rows):
     palabras = set(re.findall(r"[a-záéíóúñ]{4,}", script.lower()))
     resultados = []
     for r in rows:
-        fuente = r["_transcript"] or r["caption"]
-        match = len(palabras & set(re.findall(r"[a-záéíóúñ]{4,}", fuente.lower())))
+        if not r["_transcript"]:
+            continue
+        match = len(palabras & set(re.findall(r"[a-záéíóúñ]{4,}", r["_transcript"].lower())))
         if match >= 3:
             resultados.append((match, r))
     return sorted(resultados, key=lambda x: x[0], reverse=True)[:3]
@@ -358,7 +351,7 @@ st.divider()
 script = st.text_area(
     "Script del reel",
     height=280,
-    placeholder="Pega aquí el script o caption de tu reel...",
+    placeholder="Pega aquí lo que vas a decir en tu reel (el script hablado)...",
     label_visibility="visible",
     value=st.session_state.script,
 )
@@ -381,24 +374,22 @@ if st.session_state.analizado and st.session_state.script.strip():
 
     s_hook, n_hook = score_hook(script)
     s_tema, n_tema = score_tema(script)
-    s_tags, n_tags = score_hashtags(script)
     s_dur, n_dur = score_duracion(duracion)
+    s_cta, n_cta = score_cta(script)
 
-    total = s_hook + s_tema + s_tags + s_dur
-    pct = int((total / 85) * 100)
+    total = s_hook + s_tema + s_dur + s_cta
+    pct = int((total / 90) * 100)
+    pct = min(pct, 100)
 
     if pct >= 75:
         color = "🔥"
         veredicto = "ALTO POTENCIAL — listo para grabar"
-        bg = "success"
     elif pct >= 50:
         color = "⚡"
         veredicto = "POTENCIAL MEDIO — ajusta los puntos débiles"
-        bg = "warning"
     else:
         color = "🚫"
         veredicto = "BAJO POTENCIAL — reescribe el hook"
-        bg = "error"
 
     st.divider()
 
@@ -416,8 +407,8 @@ if st.session_state.analizado and st.session_state.script.strip():
     with col_a:
         st.subheader("🎯 Hook")
         render_notas(n_hook)
-        st.subheader("💬 Hashtags")
-        render_notas(n_tags)
+        st.subheader("📣 CTA")
+        render_notas(n_cta)
     with col_b:
         st.subheader("🔥 Tema")
         render_notas(n_tema)
@@ -451,18 +442,18 @@ if st.session_state.analizado and st.session_state.script.strip():
             "Tu script no menciona ninguno de tus temas más virales. Intenta anclar el mensaje a:\n\n"
             "- **Dinero / hacerse millonario** — siempre funciona en tu audiencia\n"
             "- **Disciplina / proceso** — Monk Mode, Winter Arc, mentalidad\n"
-            "- **Crítica al sistema** — universidad, cursos caros, política\n\n"
-            "No tienes que cambiar el tema, solo conectarlo explícitamente."
+            "- **Crítica al sistema** — universidad, cursos caros, estafas\n\n"
+            "No tienes que cambiar el tema, solo conectarlo explícitamente en el script."
         ))
 
-    # Hashtags
-    tags = re.findall(r"#\w+", script.lower())
-    buenos_tags = [t for t in tags if t in TOP_HASHTAGS]
-    if not buenos_tags:
+    # CTA
+    if s_cta == 0:
         sugerencias.append((
-            "💬 Agrega hashtags probados",
-            "Ninguno de tus hashtags actuales aparece en tus reels virales. Al final del caption agrega:\n\n"
-            "`#motivacion #negocios #podcast #crecimientopersonal`"
+            "📣 Añade un llamado a la acción",
+            "Tus reels virales casi siempre terminan con un CTA hablado. Por ejemplo:\n\n"
+            "- *\"Comenta CAVZ si quieres el video completo.\"*\n"
+            "- *\"Sígueme si eres un despierto.\"*\n"
+            "- *\"¿Estás de acuerdo? Dímelo en los comentarios.\"*"
         ))
 
     # Duración
@@ -471,16 +462,6 @@ if st.session_state.analizado and st.session_state.script.strip():
             "⏱ Recorta la duración",
             f"Con {duracion} seg estás fuera de tu zona óptima (30-55 seg). Identifica qué parte del script "
             f"puedes eliminar sin perder el mensaje central. Tus reels más virales van directo al punto."
-        ))
-
-    # CTA
-    if not any(w in script.lower() for w in ["comenta", "comentarios", "sígueme", "comparte", "link", "cavz"]):
-        sugerencias.append((
-            "📣 Añade un llamado a la acción",
-            "Tus reels virales casi siempre terminan con un CTA. Por ejemplo:\n\n"
-            "- *\"Comenta CAVZ si quieres el video completo.\"*\n"
-            "- *\"Sígueme si eres un despierto.\"*\n"
-            "- *\"¿Estás de acuerdo? Dímelo en los comentarios.\"*"
         ))
 
     if not sugerencias:
@@ -500,21 +481,24 @@ if st.session_state.analizado and st.session_state.script.strip():
         ) if sugerencias else "El script ya tiene buena estructura."
 
         top3_ejemplos = "\n\n".join(
-            f"Reel con {r['_views']:,} views ({r['_save_rate']:.1f}% saves):\n{(r['_transcript'] or r['caption'])[:300]}"
+            f"Reel con {r['_views']:,} views ({r['_save_rate']:.1f}% saves, {r['_share_rate']:.1f}% shares):\n{r['_transcript'][:350]}"
             for _, r in (similares(script, rows) or [])[:3]
+            if r["_transcript"]
         )
 
         prompt = f"""Eres el asistente de contenido de Leo Cavz, creador mexicano con 557k seguidores en Instagram.
-Su estilo es directo, coloquial, provocador y usa lenguaje mexicano auténtico.
+Su estilo es directo, coloquial, provocador y usa lenguaje mexicano auténtico (wey, pendejo, pinche, etc.).
 
-Sus patrones más virales:
-- Hook: ❌ TITULO EN MAYÚSCULAS ❌
-- Duración óptima: 30-55 segundos
-- Temas que pegan: dinero, disciplina, negocios, estoicismo, proceso, millonario
+Sus patrones más virales extraídos de transcripts reales:
+- Hook más poderoso: "En los últimos X meses/días..." (611k views)
+- También funciona: "Hablemos de [tema]...", "¿Es posible...?", "Una de las cosas que nunca voy a entender..."
+- Duración óptima en palabras: aprox. 120-200 palabras para 30-55 segundos
+- Siempre termina con CTA hablado: "Comenta CAVZ", "Sígueme si eres un despierto", "Dímelo en los comentarios"
+- Temas que más conectan: dinero, disciplina, negocios, crítica al sistema, proceso personal
 - Save rate objetivo: >2.76% | Share rate objetivo: >1.13% | Retención objetivo: >17 seg
 
-Reels similares de referencia con buen rendimiento:
-{top3_ejemplos}
+Transcripts de reels similares con buen rendimiento:
+{top3_ejemplos if top3_ejemplos else "No encontré reels similares en la base de datos."}
 
 Script original:
 {script}
@@ -522,13 +506,13 @@ Script original:
 Feedback del análisis:
 {feedback_texto}
 
-Reescribe el script aplicando el feedback. Mantén el mismo mensaje central pero mejora:
+Reescribe el script hablado aplicando el feedback. Mantén el mismo mensaje central pero mejora:
 1. El hook (primera línea debe enganchar en 2 segundos)
 2. El ritmo y fluidez para una duración de 30-55 seg
-3. El llamado a la acción al final
-4. El tono auténtico de Leo
+3. El llamado a la acción hablado al final
+4. El tono auténtico de Leo — directo, sin rodeos, lenguaje mexicano natural
 
-Devuelve SOLO el script reescrito, sin explicaciones."""
+Devuelve SOLO el script reescrito, como si fuera lo que Leo va a decir frente a la cámara. Sin explicaciones."""
 
         with st.spinner("Reescribiendo..."):
             try:
@@ -552,8 +536,7 @@ Devuelve SOLO el script reescrito, sin explicaciones."""
         st.divider()
         st.subheader("Reels tuyos más similares")
         for _, r in sim:
-            fuente = "transcript" if r["_transcript"] else "caption"
-            hook = (r["_transcript"] or r["caption"])[:100]
+            hook = r["_transcript"][:120]
             save_str = f"{r['_save_rate']:.1f}% saves" if r["_save_rate"] else ""
             share_str = f"{r['_share_rate']:.1f}% shares" if r["_share_rate"] else ""
             watch_str = f"{r['_avg_watch']:.0f}s retención" if r["_avg_watch"] else ""
@@ -565,4 +548,3 @@ Devuelve SOLO el script reescrito, sin explicaciones."""
                 <span style="color:#555;font-size:0.85rem">{hook}…</span>
             </div>
             """, unsafe_allow_html=True)
-
