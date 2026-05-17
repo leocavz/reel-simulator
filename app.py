@@ -566,5 +566,3 @@ Devuelve SOLO el script reescrito, sin explicaciones."""
             </div>
             """, unsafe_allow_html=True)
 
-elif analizar and not script.strip():
-    st.warning("Pega un script antes de analizar.")
