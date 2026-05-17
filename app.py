@@ -3,6 +3,7 @@ import csv
 import re
 from pathlib import Path
 from collections import Counter
+import anthropic
 
 # ── Config ──────────────────────────────────────────────
 st.set_page_config(
@@ -474,6 +475,63 @@ if analizar and script.strip():
         for titulo, detalle in sugerencias:
             with st.expander(titulo):
                 st.markdown(detalle)
+
+    # ── Reescritura con Claude ───────────────────────────
+    st.divider()
+    st.subheader("✍️ Reescribir con IA")
+
+    if st.button("Reescribir este script", use_container_width=True):
+        feedback_texto = "\n".join(
+            f"- {t}: {d}" for t, d in sugerencias
+        ) if sugerencias else "El script ya tiene buena estructura."
+
+        top3_ejemplos = "\n\n".join(
+            f"Reel con {r['_views']:,} views ({r['_save_rate']:.1f}% saves):\n{(r['_transcript'] or r['caption'])[:300]}"
+            for _, r in (similares(script, rows) or [])[:3]
+        )
+
+        prompt = f"""Eres el asistente de contenido de Leo Cavz, creador mexicano con 557k seguidores en Instagram.
+Su estilo es directo, coloquial, provocador y usa lenguaje mexicano auténtico.
+
+Sus patrones más virales:
+- Hook: ❌ TITULO EN MAYÚSCULAS ❌
+- Duración óptima: 30-55 segundos
+- Temas que pegan: dinero, disciplina, negocios, estoicismo, proceso, millonario
+- Save rate objetivo: >2.76% | Share rate objetivo: >1.13% | Retención objetivo: >17 seg
+
+Reels similares de referencia con buen rendimiento:
+{top3_ejemplos}
+
+Script original:
+{script}
+
+Feedback del análisis:
+{feedback_texto}
+
+Reescribe el script aplicando el feedback. Mantén el mismo mensaje central pero mejora:
+1. El hook (primera línea debe enganchar en 2 segundos)
+2. El ritmo y fluidez para una duración de 30-55 seg
+3. El llamado a la acción al final
+4. El tono auténtico de Leo
+
+Devuelve SOLO el script reescrito, sin explicaciones."""
+
+        with st.spinner("Reescribiendo..."):
+            try:
+                client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+                response = client.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=1024,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                reescrito = response.content[0].text
+                st.markdown("**Script reescrito:**")
+                st.markdown(f"""
+                <div style="background:#111;border-left:2px solid #fff;padding:1.2rem;border-radius:2px;
+                font-family:'Barlow',sans-serif;color:#e0e0e0;line-height:1.7;white-space:pre-wrap">{reescrito}</div>
+                """, unsafe_allow_html=True)
+            except Exception as e:
+                st.error(f"Error: {e}")
 
     sim = similares(script, rows)
     if sim:
