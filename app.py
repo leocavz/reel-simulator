@@ -217,6 +217,8 @@ hr {
 BASE = Path(__file__).parent
 CSV_FILE = BASE / "leo_cavz_reels.csv"
 TRANSCRIPTS_DIR = BASE / "transcripts"
+COMP_CSV = BASE / "competidores_reels.csv"
+COMP_TRANS_DIR = BASE / "competidores" / "transcripts"
 
 # ── Palabras y hooks en ESPAÑOL (de transcripts virales de Leo) ─────────────
 PALABRAS_VIRALES_ES = {
@@ -283,10 +285,32 @@ def cargar_datos():
         except: r["_avg_watch"] = 0
         r["_save_rate"] = r["_saves"] / r["_reach"] * 100 if r["_reach"] > 0 else 0
         r["_share_rate"] = r["_shares"] / r["_reach"] * 100 if r["_reach"] > 0 else 0
+        r["_cuenta"] = "leo_cavz"
         code = r["shortCode"]
         txt = TRANSCRIPTS_DIR / f"{code}.txt"
         r["_transcript"] = txt.read_text(encoding="utf-8") if txt.exists() else ""
     return sorted(rows, key=lambda r: r["_views"], reverse=True)
+
+@st.cache_data
+def cargar_competidores():
+    if not COMP_CSV.exists():
+        return []
+    with open(COMP_CSV) as f:
+        rows = list(csv.DictReader(f))
+    for r in rows:
+        try: r["_views"] = int(r["views"]) if r.get("views") else 0
+        except: r["_views"] = 0
+        r["_saves"] = 0
+        r["_shares"] = 0
+        r["_reach"] = 0
+        r["_avg_watch"] = 0
+        r["_save_rate"] = 0
+        r["_share_rate"] = 0
+        r["_cuenta"] = r.get("cuenta", "competidor")
+        code = r["shortCode"]
+        txt = COMP_TRANS_DIR / f"{code}.txt"
+        r["_transcript"] = txt.read_text(encoding="utf-8") if txt.exists() else r.get("transcript", "")
+    return [r for r in rows if r["_transcript"].strip()]
 
 def score_hook(script, idioma="es"):
     primera = script.strip().split("\n")[0].lower()[:200]
@@ -357,16 +381,18 @@ def score_cta(script, idioma="es"):
             notas.append(("💡", "Agrega al final: *'Comenta CAVZ'* / *'Sígueme si eres un despierto'*"))
     return score, notas
 
-def similares(script, rows):
-    palabras = set(re.findall(r"[a-záéíóúñ]{4,}", script.lower()))
+def similares(script, rows, comp_rows):
+    # Bilingüe: captura palabras en español e inglés
+    palabras = set(re.findall(r"[a-záéíóúñA-ZÁÉÍÓÚÑa-z]{4,}", script.lower()))
     resultados = []
-    for r in rows:
-        if not r["_transcript"]:
+    for r in (rows + comp_rows):
+        if not r.get("_transcript"):
             continue
-        match = len(palabras & set(re.findall(r"[a-záéíóúñ]{4,}", r["_transcript"].lower())))
+        t_words = set(re.findall(r"[a-záéíóúñA-ZÁÉÍÓÚÑa-z]{4,}", r["_transcript"].lower()))
+        match = len(palabras & t_words)
         if match >= 3:
             resultados.append((match, r))
-    return sorted(resultados, key=lambda x: x[0], reverse=True)[:3]
+    return sorted(resultados, key=lambda x: x[0], reverse=True)[:5]
 
 def render_notas(notas):
     for icon, texto in notas:
@@ -388,7 +414,7 @@ st.markdown("""
 </div>
 <h1>Simulador de Reels</h1>
 """, unsafe_allow_html=True)
-st.caption("Análisis basado en 194 reels · 191 transcripts · saves, shares y retención reales")
+st.caption("Análisis basado en 194 reels propios + 252 de competidores · 434 transcripts · saves, shares y retención reales")
 st.divider()
 
 script = st.text_area(
@@ -413,7 +439,8 @@ if st.session_state.analizado and st.session_state.script.strip():
     script = st.session_state.script
     duracion = st.session_state.duracion
     rows = cargar_datos()
-    con_transcript = sum(1 for r in rows if r["_transcript"])
+    comp_rows = cargar_competidores()
+    con_transcript = sum(1 for r in rows if r["_transcript"]) + len(comp_rows)
 
     idioma = detectar_idioma(script)
     idioma_label = "🇺🇸 Inglés detectado — análisis bilingüe, output en español" if idioma == "en" else "🇲🇽 Español detectado"
@@ -558,9 +585,9 @@ if st.session_state.analizado and st.session_state.script.strip():
         ) if sugerencias else "El script ya tiene buena estructura."
 
         top3_ejemplos = "\n\n".join(
-            f"Reel con {r['_views']:,} views ({r['_save_rate']:.1f}% saves, {r['_share_rate']:.1f}% shares):\n{r['_transcript'][:350]}"
-            for _, r in (similares(script, rows) or [])[:3]
-            if r["_transcript"]
+            f"@{r['_cuenta']} — {r['_views']:,} views:\n{r['_transcript'][:350]}"
+            for _, r in (similares(script, rows, comp_rows) or [])[:3]
+            if r.get("_transcript")
         )
 
         idioma_instruccion = (
@@ -616,20 +643,25 @@ Devuelve SOLO el script reescrito en español, como si fuera lo que Leo va a dec
             except Exception as e:
                 st.error(f"Error: {e}")
 
-    sim = similares(script, rows)
+    sim = similares(script, rows, comp_rows)
     if sim:
         st.divider()
-        st.subheader("Reels tuyos más similares")
+        st.subheader("Reels similares en el nicho")
         for _, r in sim:
             hook = r["_transcript"][:120]
-            save_str = f"{r['_save_rate']:.1f}% saves" if r["_save_rate"] else ""
-            share_str = f"{r['_share_rate']:.1f}% shares" if r["_share_rate"] else ""
-            watch_str = f"{r['_avg_watch']:.0f}s retención" if r["_avg_watch"] else ""
+            cuenta = r.get("_cuenta", "")
+            es_leo = cuenta == "leo_cavz"
+            cuenta_label = f"@{cuenta}"
+            border_color = "#ffffff" if es_leo else "#444444"
+            save_str = f"{r['_save_rate']:.1f}% saves" if r.get("_save_rate") else ""
+            share_str = f"{r['_share_rate']:.1f}% shares" if r.get("_share_rate") else ""
+            watch_str = f"{r['_avg_watch']:.0f}s retención" if r.get("_avg_watch") else ""
             metrics = " · ".join(filter(None, [save_str, share_str, watch_str]))
             st.markdown(f"""
-            <div class="reel-card">
+            <div class="reel-card" style="border-left-color:{border_color}">
                 <span class="reel-views">{int(r['_views']):,} views</span>
-                <span style="color:#666;font-size:0.8rem;margin-left:8px">{metrics}</span><br>
+                <span style="color:#666;font-size:0.8rem;margin-left:8px">{metrics}</span>
+                <span style="color:#555;font-size:0.78rem;margin-left:8px">{cuenta_label}</span><br>
                 <span style="color:#555;font-size:0.85rem">{hook}…</span>
             </div>
             """, unsafe_allow_html=True)
