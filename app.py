@@ -324,13 +324,37 @@ def cargar_competidores():
     for r in rows:
         try: r["_views"] = int(r["views"]) if r.get("views") else 0
         except: r["_views"] = 0
-        r["_saves"] = 0; r["_shares"] = 0; r["_reach"] = 0
+        try: r["_compartidas"] = int(r["compartidas"]) if r.get("compartidas") else 0
+        except: r["_compartidas"] = 0
+        try: r["_likes"] = int(r["likes"]) if r.get("likes") else 0
+        except: r["_likes"] = 0
+        try: r["_comentarios"] = int(r["comentarios"]) if r.get("comentarios") else 0
+        except: r["_comentarios"] = 0
+        r["_saves"] = 0; r["_shares"] = r["_compartidas"]; r["_reach"] = 0
         r["_avg_watch"] = 0; r["_save_rate"] = 0; r["_share_rate"] = 0
         r["_cuenta"] = r.get("cuenta", "competidor")
         code = r["shortCode"]
         txt = COMP_TRANS_DIR / f"{code}.txt"
         r["_transcript"] = txt.read_text(encoding="utf-8") if txt.exists() else r.get("transcript", "")
-    return [r for r in rows if r["_transcript"].strip()]
+    rows = [r for r in rows if r["_transcript"].strip()]
+    # Score ponderado normalizado por cuenta: compartidas(45%) + views(30%) + likes(15%) + comentarios(10%)
+    from collections import defaultdict as _dd
+    by_acc = _dd(list)
+    for r in rows:
+        by_acc[r["_cuenta"]].append(r)
+    for acc_rows in by_acc.values():
+        mx_c = max((r["_compartidas"] for r in acc_rows), default=1) or 1
+        mx_v = max((r["_views"] for r in acc_rows), default=1) or 1
+        mx_l = max((r["_likes"] for r in acc_rows), default=1) or 1
+        mx_cm = max((r["_comentarios"] for r in acc_rows), default=1) or 1
+        for r in acc_rows:
+            r["_viral_score"] = (
+                r["_compartidas"] / mx_c * 0.45 +
+                r["_views"] / mx_v * 0.30 +
+                r["_likes"] / mx_l * 0.15 +
+                r["_comentarios"] / mx_cm * 0.10
+            )
+    return rows
 
 @st.cache_data
 def construir_idf():
@@ -384,7 +408,7 @@ def extraer_patrones_nicho():
     comp_con_t = [r for r in comp_rows if r.get("_transcript") and r["_views"] > 0]
     if not comp_con_t:
         return []
-    comp_con_t.sort(key=lambda r: r["_views"], reverse=True)
+    comp_con_t.sort(key=lambda r: r.get("_viral_score", r["_views"]), reverse=True)
     top_comp = comp_con_t[:max(int(len(comp_con_t) * 0.10), 5)]
 
     leo_con_t = [r for r in rows if r.get("_transcript") and r["_views"] > 0]
