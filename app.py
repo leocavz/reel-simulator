@@ -464,8 +464,12 @@ def analizar_con_claude(client, script, sim_reels, top_patterns, bot_patterns, n
     for i, (_, r) in enumerate(sim_reels[:6], 1):
         cuenta = r.get("_cuenta", "")
         views = r["_views"]
+        compartidas = r.get("_compartidas", 0)
+        stats = f"{views:,} views"
+        if compartidas:
+            stats += f" · {compartidas:,} compartidos"
         hook = r["_transcript"][:220].replace("\n", " ")
-        context_reels += f"\n{i}. @{cuenta} — {views:,} views:\n\"{hook}...\"\n"
+        context_reels += f"\n{i}. @{cuenta} — {stats}:\n\"{hook}...\"\n"
 
     idioma_instruccion = (
         "El script está en INGLÉS. Analiza en español."
