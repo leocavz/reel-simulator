@@ -1,0 +1,31 @@
+name: Actualizar CSV de reels
+
+on:
+  schedule:
+    - cron: '0 10 * * 1'  # Cada lunes a las 10am UTC (4am Ciudad de México)
+  workflow_dispatch:
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Actualizar CSV
+        env:
+          IG_TOKEN: ${{ secrets.IG_TOKEN }}
+        run: python3 actualizar_csv.py
+
+      - name: Commit y push si hay cambios
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add leo_cavz_reels.csv
+          git diff --staged --quiet && echo "Sin cambios" || (
+            git commit -m "chore: actualizar CSV $(date +%Y-%m-%d)" &&
+            git push
+          )

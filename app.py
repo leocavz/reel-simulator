@@ -1,7 +1,12 @@
 import streamlit as st
 import csv
+import json
+import os
 import re
 import math
+import urllib.request
+import urllib.error
+from datetime import date, timedelta
 from pathlib import Path
 from collections import Counter
 import anthropic
@@ -231,6 +236,46 @@ CSV_FILE = BASE / "leo_cavz_reels.csv"
 TRANSCRIPTS_DIR = BASE / "transcripts"
 COMP_CSV = BASE / "competidores_reels.csv"
 COMP_TRANS_DIR = BASE / "competidores" / "transcripts"
+REFS_DIR = BASE / "referencias"
+NOTION_DB_ID = "361ad8c7-557b-80c2-9ff9-fac8b2098885"
+
+def proximo_jueves():
+    hoy = date.today()
+    dias = (3 - hoy.weekday()) % 7
+    return str(hoy + timedelta(days=dias or 7))
+
+def push_to_notion(titulo, script_text, semana, ref_url=""):
+    token = st.secrets.get("NOTION_TOKEN", os.environ.get("NOTION_TOKEN", ""))
+    if not token:
+        raise ValueError("NOTION_TOKEN no configurado en secrets")
+    body = {
+        "parent": {"database_id": NOTION_DB_ID},
+        "properties": {
+            "Título": {"title": [{"text": {"content": titulo[:255]}}]},
+            "Script": {"rich_text": [{"text": {"content": script_text[:2000]}}]},
+            "Estado": {"status": {"name": "Listo para grabar"}},
+            "Formato": {"select": {"name": "Video"}},
+            "Plataforma": {"multi_select": [{"name": "Ig"}]},
+            "Fecha de Publicación": {"date": {"start": proximo_jueves()}},
+            "Semana": {"select": {"name": semana}},
+        },
+    }
+    if ref_url.strip():
+        body["properties"]["Referencia"] = {"url": ref_url.strip()}
+    data = json.dumps(body).encode()
+    req = urllib.request.Request(
+        "https://api.notion.com/v1/pages",
+        data=data,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "Notion-Version": "2022-06-28",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=10) as r:
+        result = json.loads(r.read())
+    return result.get("url", "")
 
 STOP_WORDS = {
     "para","como","pero","más","muy","hay","que","con","los","las","una","del",
@@ -299,25 +344,26 @@ def construir_idf():
         df.update(words)
     return {w: math.log(N / max(c, 1)) for w, c in df.items()}
 
+def _palabras_grupo(reels):
+    words = []
+    for r in reels:
+        words.extend(re.findall(r"[a-záéíóúñA-ZÁÉÍÓÚÑa-z]{4,}", r["_transcript"].lower()))
+    return Counter(w for w in words if w not in STOP_WORDS)
+
 @st.cache_data
 def extraer_patrones_leo():
+    """Patrones exclusivos del top 1% de Leo vs su bottom 75%."""
     rows = cargar_datos()
     con_transcript = [r for r in rows if r.get("_transcript") and r["_views"] > 0]
     if len(con_transcript) < 8:
         return [], []
     con_transcript.sort(key=lambda r: r["_views"], reverse=True)
     n = len(con_transcript)
-    top = con_transcript[:max(n // 4, 4)]
-    bottom = con_transcript[min(3 * n // 4, n - 4):]
+    top = con_transcript[:max(int(n * 0.01), 2)]
+    bottom = con_transcript[min(int(n * 0.75), n - 2):]
 
-    def palabras_grupo(reels):
-        words = []
-        for r in reels:
-            words.extend(re.findall(r"[a-záéíóúñA-ZÁÉÍÓÚÑa-z]{4,}", r["_transcript"].lower()))
-        return Counter(w for w in words if w not in STOP_WORDS)
-
-    top_cnt = palabras_grupo(top)
-    bot_cnt = palabras_grupo(bottom)
+    top_cnt = _palabras_grupo(top)
+    bot_cnt = _palabras_grupo(bottom)
     n_top, n_bot = max(len(top), 1), max(len(bottom), 1)
 
     top_char = [
@@ -328,8 +374,31 @@ def extraer_patrones_leo():
         w for w, c in bot_cnt.most_common(80)
         if bot_cnt[w] / n_bot > top_cnt.get(w, 0) / n_top * 1.5 and c >= 2
     ][:20]
-
     return top_char, bot_char
+
+@st.cache_data
+def extraer_patrones_nicho():
+    """Patrones del top 10% de competidores (reels de mayor alcance en el nicho) vs bottom de Leo."""
+    rows = cargar_datos()
+    comp_rows = cargar_competidores()
+    comp_con_t = [r for r in comp_rows if r.get("_transcript") and r["_views"] > 0]
+    if not comp_con_t:
+        return []
+    comp_con_t.sort(key=lambda r: r["_views"], reverse=True)
+    top_comp = comp_con_t[:max(int(len(comp_con_t) * 0.10), 5)]
+
+    leo_con_t = [r for r in rows if r.get("_transcript") and r["_views"] > 0]
+    leo_con_t.sort(key=lambda r: r["_views"], reverse=True)
+    bottom_leo = leo_con_t[min(int(len(leo_con_t) * 0.75), len(leo_con_t) - 2):]
+
+    top_cnt = _palabras_grupo(top_comp)
+    bot_cnt = _palabras_grupo(bottom_leo)
+    n_top, n_bot = max(len(top_comp), 1), max(len(bottom_leo), 1)
+
+    return [
+        w for w, c in top_cnt.most_common(100)
+        if top_cnt[w] / n_top > bot_cnt.get(w, 0) / n_bot * 1.5 and c >= 3
+    ][:20]
 
 def similares_idf(script, rows, comp_rows, idf):
     script_words = set(re.findall(r"[a-záéíóúñA-ZÁÉÍÓÚÑa-z]{4,}", script.lower())) - STOP_WORDS
@@ -366,7 +435,7 @@ def fmt_views(v):
         return f"{round(v / 1_000):.0f}k"
     return str(v)
 
-def analizar_con_claude(client, script, sim_reels, top_patterns, bot_patterns, idioma, duracion):
+def analizar_con_claude(client, script, sim_reels, top_patterns, bot_patterns, nicho_patterns, idioma, duracion):
     context_reels = ""
     for i, (_, r) in enumerate(sim_reels[:6], 1):
         cuenta = r.get("_cuenta", "")
@@ -396,10 +465,13 @@ SCRIPT A ANALIZAR:
 REELS SIMILARES EN LA BASE DE DATOS (ordenados por similitud semántica con el script):
 {context_reels if context_reels else "No se encontraron reels con tema similar."}
 
-PALABRAS Y CONCEPTOS QUE APARECEN MÁS EN LOS REELS TOP DE LEO (>200k views):
+PATRONES DEL TOP 1% DE LEO (sus 2 reels con +500k views):
 {', '.join(top_patterns[:15]) if top_patterns else 'datos insuficientes'}
 
-PALABRAS Y CONCEPTOS QUE APARECEN MÁS EN LOS REELS DE BAJO RENDIMIENTO DE LEO (<30k views):
+PATRONES DEL TOP 10% DEL NICHO (top performers de @salomondrin, @hormozi, @jaimehigueraes, @imangadzhireels, @robthebank — reels de hasta 7M views):
+{', '.join(nicho_patterns[:15]) if nicho_patterns else 'datos insuficientes'}
+
+PALABRAS Y CONCEPTOS MÁS COMUNES EN EL BAJO RENDIMIENTO DE LEO:
 {', '.join(bot_patterns[:15]) if bot_patterns else 'datos insuficientes'}
 
 Analiza comparando el script contra los datos reales. No inventes reglas genéricas.
@@ -434,6 +506,7 @@ defaults = {
     "script": "", "duracion": 0, "analizado": False,
     "analisis_result": "", "sim_cached": [], "pred_cached": None,
     "last_analyzed_script": "",
+    "reescrito": "", "notion_guardado": False,
 }
 for k, v in defaults.items():
     if k not in st.session_state:
@@ -475,6 +548,7 @@ if st.session_state.analizado and st.session_state.script.strip():
     comp_rows = cargar_competidores()
     idf = construir_idf()
     top_patterns, bot_patterns = extraer_patrones_leo()
+    nicho_patterns = extraer_patrones_nicho()
     idioma = detectar_idioma(script)
 
     # Recalculate only when script changed
@@ -484,6 +558,8 @@ if st.session_state.analizado and st.session_state.script.strip():
         st.session_state.sim_cached = sim
         st.session_state.pred_cached = pred
         st.session_state.last_analyzed_script = script
+        st.session_state.reescrito = ""
+        st.session_state.notion_guardado = False
     else:
         sim = st.session_state.sim_cached
         pred = st.session_state.pred_cached
@@ -520,7 +596,7 @@ if st.session_state.analizado and st.session_state.script.strip():
             placeholder = st.empty()
             full_text = ""
             for chunk in analizar_con_claude(
-                client, script, sim, top_patterns, bot_patterns, idioma, duracion
+                client, script, sim, top_patterns, bot_patterns, nicho_patterns, idioma, duracion
             ):
                 full_text += chunk
                 placeholder.markdown(full_text + "▌")
@@ -551,15 +627,14 @@ if st.session_state.analizado and st.session_state.script.strip():
 Su estilo es directo, coloquial, provocador y usa lenguaje mexicano auténtico (wey, pendejo, etc.).
 {idioma_instruccion}
 
-Sus patrones más virales extraídos de transcripts reales:
-- Hook más poderoso: "En los últimos X meses/días..." (611k views)
-- También funciona: "Hablemos de [tema]...", "¿Es posible...?", "Una de las cosas que nunca voy a entender..."
-- Duración óptima: ~120-200 palabras para 30-55 segundos
-- CTA final siempre hablado: "Comenta CAVZ", "Sígueme si eres un despierto", "Dímelo en los comentarios"
-- Temas más fuertes: dinero, disciplina, negocios, crítica al sistema, proceso personal
+PATRONES DEL TOP 1% DE LEO (sus 2 reels con +500k views — lo que funciona para SU audiencia):
+{', '.join(top_patterns[:12]) if top_patterns else 'N/A'}
 
-Transcripts similares con buen rendimiento para referencia:
-{top3_ejemplos if top3_ejemplos else "No encontré reels similares."}
+PATRONES DEL NICHO (top 10% de @salomondrin, @hormozi, @jaimehigueraes, @imangadzhireels, @robthebank — hasta 7M views):
+{', '.join(nicho_patterns[:12]) if nicho_patterns else 'N/A'}
+
+Reels similares con buen rendimiento (referencia de hook y estructura):
+{top3_ejemplos if top3_ejemplos else "Sin similares directos."}
 
 Script original:
 {script}
@@ -567,8 +642,8 @@ Script original:
 Análisis previo:
 {st.session_state.analisis_result[:400] if st.session_state.analisis_result else ""}
 
-Reescribe el script hablado en ESPAÑOL aplicando las mejoras del análisis. Mantén el mensaje central.
-Devuelve SOLO el script. Sin explicaciones, sin encabezados."""
+Aplica los patrones del top 1% de Leo y del nicho. Mantén el mensaje central.
+Devuelve SOLO el script hablado. Sin explicaciones, sin encabezados."""
 
         with st.spinner("Reescribiendo..."):
             try:
@@ -578,13 +653,47 @@ Devuelve SOLO el script. Sin explicaciones, sin encabezados."""
                     max_tokens=1024,
                     messages=[{"role": "user", "content": prompt_rewrite}],
                 )
-                reescrito = response.content[0].text
-                st.markdown(f"""
-                <div style="background:#111;border-left:2px solid #fff;padding:1.2rem;border-radius:2px;
-                font-family:'Barlow',sans-serif;color:#e0e0e0;line-height:1.7;white-space:pre-wrap">{reescrito}</div>
-                """, unsafe_allow_html=True)
+                st.session_state.reescrito = response.content[0].text
+                st.session_state.notion_guardado = False
             except Exception as e:
                 st.error(f"Error: {e}")
+
+    if st.session_state.reescrito:
+        reescrito = st.session_state.reescrito
+        st.markdown(
+            f'<div style="background:#111;border-left:2px solid #fff;padding:1.2rem;border-radius:2px;'
+            f'font-family:\'Barlow\',sans-serif;color:#e0e0e0;line-height:1.7;white-space:pre-wrap">'
+            f'{reescrito}</div>',
+            unsafe_allow_html=True,
+        )
+
+        # ── Guardar en Banco de Contenido ────────────────────
+        st.divider()
+        st.subheader("📋 Guardar en Banco de Contenido")
+        titulo_sugerido = reescrito.strip().split("\n")[0][:100].lstrip("- •*#").strip()
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            titulo_notion = st.text_input("Título", value=titulo_sugerido, key="notion_titulo")
+        with col2:
+            semana_notion = st.selectbox("Semana", ["s1", "s2", "s3", "s4"], key="notion_semana")
+        ref_notion = st.text_input(
+            "URL de referencia (opcional)",
+            placeholder="https://www.instagram.com/p/...",
+            key="notion_ref",
+        )
+
+        if st.session_state.notion_guardado:
+            st.success(f"Guardado en Notion — agendado para grabar el {proximo_jueves()}")
+        elif st.button("Guardar en Banco de Contenido", type="primary", use_container_width=True):
+            with st.spinner("Guardando en Notion..."):
+                try:
+                    notion_url = push_to_notion(titulo_notion, reescrito, semana_notion, ref_notion)
+                    st.session_state.notion_guardado = True
+                    st.success(f"Guardado — agendado para grabar el {proximo_jueves()}")
+                    if notion_url:
+                        st.markdown(f"[Abrir en Notion]({notion_url})")
+                except Exception as e:
+                    st.error(f"Error al guardar: {e}")
 
     # ── Similar reels ────────────────────────────────────
     if sim:
